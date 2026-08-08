@@ -59,7 +59,6 @@ export default async function RootLayout({ children }: RootLayoutProps) {
       )}
     >
       <head>
-        {styles && <style>{styles}</style>}
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
         <meta name="theme-color" content="#0a0e1a" />

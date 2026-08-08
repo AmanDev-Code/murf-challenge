@@ -1265,7 +1265,7 @@ async def voicepay_session(ctx: JobContext) -> None:
             speed=0,
             pitch=0,
             tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
-            text_pacing=True,
+            text_pacing=False,
         ),
         turn_detection=MultilingualModel(),
         vad=ctx.proc.userdata["vad"],
@@ -1434,7 +1434,7 @@ async def voicepay_session(ctx: JobContext) -> None:
                 speed=0,
                 pitch=0,
                 tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
-                text_pacing=True,
+                text_pacing=False,
             )
             # Direct internal attribute swap — session.tts property is read-only
             session._tts = new_tts
