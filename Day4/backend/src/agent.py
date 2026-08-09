@@ -1313,7 +1313,7 @@ class VoicePayAgent(Agent):
         user_name: str,
         facts: str = "",
         language_preference: str = "",
-    ) -> dict[str, Any]:
+    ) -> str:
         """Save information about the caller for future conversations.
 
         IMPORTANT: You MUST ask the user for permission BEFORE calling this tool.
@@ -1336,7 +1336,7 @@ class VoicePayAgent(Agent):
         self.stats.bump_tool("remember_user_info")
 
         if not self._user_id:
-            return {"error": "No user identity available", "saved": False}
+            return "No user identity available. Tell the user you cannot save their info right now."
 
         # Parse facts into key-value pairs
         fact_dict: dict[str, str] = {}
@@ -1365,10 +1365,7 @@ class VoicePayAgent(Agent):
         for pat in sensitive_patterns:
             if re.search(pat, all_text, re.I):
                 logger.warning("BLOCKED: attempt to store sensitive data in memory")
-                return {
-                    "error": "Cannot store sensitive information like account numbers, Aadhaar, PAN, or passwords.",
-                    "saved": False,
-                }
+                return "BLOCKED: Cannot store sensitive information like account numbers, Aadhaar, PAN, or passwords. Tell the user you cannot save that kind of information for security reasons."
 
         try:
             # Save user record
@@ -1386,15 +1383,12 @@ class VoicePayAgent(Agent):
                 await save_facts(self._user_id, fact_dict)
 
             logger.info("remember_user_info: saved name=%s facts=%d", user_name, len(fact_dict))
-            return {
-                "saved": True,
-                "name": user_name,
-                "facts_count": len(fact_dict),
-                "message": f"I'll remember you as {user_name}. Next time you call, I'll greet you by name!",
-            }
+            # Return a string — Gemini handles string tool results better than dicts
+            # and is forced to generate a spoken response after receiving this.
+            return f"SUCCESS: Saved user name '{user_name}' with {len(fact_dict)} facts. Now tell the user warmly that you'll remember them next time. Speak naturally."
         except Exception as e:
             logger.exception("remember_user_info failed")
-            return {"error": str(e), "saved": False}
+            return f"ERROR: Could not save. Tell the user there was a small issue but you'll try again next time. Error: {str(e)}"
 
     @function_tool
     async def recall_user_info(
@@ -1489,7 +1483,7 @@ class VoicePayAgent(Agent):
     async def forget_me(
         self,
         context: RunContext,
-    ) -> dict[str, Any]:
+    ) -> str:
         """Completely delete all stored data about the current caller.
 
         Call this ONLY when the user explicitly asks to be forgotten.
@@ -1502,7 +1496,7 @@ class VoicePayAgent(Agent):
         self.stats.bump_tool("forget_me")
 
         if not self._user_id:
-            return {"deleted": False, "reason": "No user identity available"}
+            return "No user identity available. Tell the user you cannot delete data right now."
 
         try:
             deleted = await forget_user(self._user_id)
@@ -1511,18 +1505,12 @@ class VoicePayAgent(Agent):
                 self._user_memory = None
                 self._consent_given = False
                 logger.info("forget_me: DELETED all data for user=%s", self._user_id)
-                return {
-                    "deleted": True,
-                    "message": "Done. All your data has been permanently deleted. I won't remember you next time.",
-                }
+                return "SUCCESS: All user data has been permanently deleted. Tell the user their data is gone and you won't remember them next time. Be warm about it."
             else:
-                return {
-                    "deleted": False,
-                    "message": "I don't have any stored data about you to delete.",
-                }
+                return "No stored data found for this user. Tell the user you don't have any data about them to delete."
         except Exception as e:
             logger.exception("forget_me failed")
-            return {"deleted": False, "error": str(e)}
+            return f"ERROR: Could not delete data. Tell the user there was a problem. Error: {str(e)}"
 # =============================================================================
 # SERVER + SESSION WIRING
 # =============================================================================
@@ -1667,7 +1655,9 @@ async def voicepay_session(ctx: JobContext) -> None:
             tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
             text_pacing=False,
         ),
-        turn_detection=MultilingualModel(),
+        turn_detection=MultilingualModel(
+            unlikely_threshold=0.3,  # lower = more sensitive to turns
+        ),
         vad=ctx.proc.userdata["vad"],
         # Kick off LLM generation while the user is still finishing their
         # sentence — biggest single win for perceived latency.
