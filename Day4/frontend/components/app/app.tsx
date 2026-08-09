@@ -76,6 +76,18 @@ export function App({ appConfig }: AppProps) {
   const [selectedVoice, setSelectedVoice] = useState<VoiceId>('anisha');
   const [locale, setLocale] = useState<Locale>('en');
 
+  // Stable user identity — persists across sessions via localStorage
+  const stableUserId = useMemo(() => {
+    if (typeof window === 'undefined') return 'voicepay_user_ssr';
+    const key = 'voicepay_user_id';
+    let id = localStorage.getItem(key);
+    if (!id) {
+      id = `voicepay_user_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+      localStorage.setItem(key, id);
+    }
+    return id;
+  }, []);
+
   // Detect locale from persona selection
   useEffect(() => {
     // Pooja is explicitly bilingual/Hindi-first
@@ -96,6 +108,7 @@ export function App({ appConfig }: AppProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           voice: selectedVoice,
+          participantIdentity: stableUserId,
           ...(options.agentName && {
             room_config: { agents: [{ agentName: options.agentName }] },
           }),
@@ -112,7 +125,7 @@ export function App({ appConfig }: AppProps) {
         participantToken: data.participantToken,
       };
     });
-  }, [appConfig, selectedVoice]);
+  }, [appConfig, selectedVoice, stableUserId]);
 
   const session = useSession(
     tokenSource,
