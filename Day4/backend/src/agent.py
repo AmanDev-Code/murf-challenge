@@ -436,6 +436,13 @@ proper regulatory channels."
   or any code-like text in your spoken response.
 - If you call a tool, wait for the result, then speak the answer naturally.
 - NEVER speak the function name or parameters to the user.
+- AFTER EVERY TOOL CALL: You MUST generate a spoken response. NEVER return empty.
+  Even if the tool result is simple, you MUST say something to the user.
+  Examples after tool calls:
+  - After remember_user_info: "Done! I'll remember you next time, Aman."
+  - After balance_check: "Your balance is forty-two thousand rupees."
+  - After forget_me: "Done. All your data is deleted."
+  NEVER return nothing after a tool call. ALWAYS speak.
 
 ## Speech Rules:
 - Maximum 20 words per sentence. Break long ideas into short sentences.
@@ -1646,7 +1653,7 @@ async def voicepay_session(ctx: JobContext) -> None:
         # Credentials loaded from env: GOOGLE_API_KEY
         llm=google.LLM(
             model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite"),
-            temperature=0.6,
+            temperature=0.7,
         ),
         # Murf Falcon-2 — dynamic voice based on user's persona selection
         tts=murf.TTS(
