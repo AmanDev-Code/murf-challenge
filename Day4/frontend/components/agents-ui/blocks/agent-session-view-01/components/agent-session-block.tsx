@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, type MotionProps, motion } from 'motion/react';
 import { useAgent, useSessionContext, useSessionMessages } from '@livekit/components-react';
 import { Mic, Sparkles, Lock, Clock, Phone, Wifi } from 'lucide-react';
@@ -339,6 +339,14 @@ export function AgentSessionView_01({
   const { items: canvasItems, dismissItem: dismissCanvasItem, clearCanvas } = useCanvasData();
   const isSlowNetwork = useSlowNetwork();
 
+  const handleEndCall = useCallback(() => {
+    if (onEndCall) {
+      onEndCall();
+    } else {
+      session.end();
+    }
+  }, [onEndCall, session]);
+
   const controls: AgentControlBarControls = {
     leave: true,
     microphone: true,
@@ -381,7 +389,7 @@ export function AgentSessionView_01({
         {/* Right: Timer + Emergency */}
         <div className="flex items-center gap-2">
           <InlineSessionTimer startTime={callStartTime || null} />
-          <InlineEmergencyButton onClick={onEndCall || session.end} />
+          <InlineEmergencyButton onClick={handleEndCall} />
         </div>
       </div>
 
@@ -415,18 +423,20 @@ export function AgentSessionView_01({
       </AnimatePresence>
 
       {/* ─── CENTER: Audio Visualizer ─── */}
-      <TileLayout
-        chatOpen={chatOpen}
-        audioVisualizerType={audioVisualizerType}
-        audioVisualizerColor={audioVisualizerColor}
-        audioVisualizerColorShift={audioVisualizerColorShift}
-        audioVisualizerBarCount={audioVisualizerBarCount}
-        audioVisualizerRadialBarCount={audioVisualizerRadialBarCount}
-        audioVisualizerRadialRadius={audioVisualizerRadialRadius}
-        audioVisualizerGridRowCount={audioVisualizerGridRowCount}
-        audioVisualizerGridColumnCount={audioVisualizerGridColumnCount}
-        audioVisualizerWaveLineWidth={audioVisualizerWaveLineWidth}
-      />
+      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+        <TileLayout
+          chatOpen={chatOpen}
+          audioVisualizerType={audioVisualizerType}
+          audioVisualizerColor={audioVisualizerColor}
+          audioVisualizerColorShift={audioVisualizerColorShift}
+          audioVisualizerBarCount={audioVisualizerBarCount}
+          audioVisualizerRadialBarCount={audioVisualizerRadialBarCount}
+          audioVisualizerRadialRadius={audioVisualizerRadialRadius}
+          audioVisualizerGridRowCount={audioVisualizerGridRowCount}
+          audioVisualizerGridColumnCount={audioVisualizerGridColumnCount}
+          audioVisualizerWaveLineWidth={audioVisualizerWaveLineWidth}
+        />
+      </div>
 
       {/* ─── Canvas Panel ─── */}
       <CanvasPanel items={canvasItems} onDismiss={dismissCanvasItem} onClear={clearCanvas} />
@@ -466,7 +476,7 @@ export function AgentSessionView_01({
             controls={controls}
             isChatOpen={chatOpen}
             isConnected={session.isConnected}
-            onDisconnect={onEndCall || session.end}
+            onDisconnect={handleEndCall}
             onIsChatOpenChange={setChatOpen}
           />
         </div>
