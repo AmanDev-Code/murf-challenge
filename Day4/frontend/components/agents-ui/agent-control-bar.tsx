@@ -253,7 +253,8 @@ export function AgentControlBar({
 }: AgentControlBarProps & ComponentProps<'div'>) {
   const { send } = useChat();
   const publishPermissions = usePublishPermissions();
-  const [isChatOpenUncontrolled, setIsChatOpenUncontrolled] = useState(isChatOpen);
+  const [isChatOpenUncontrolled, setIsChatOpenUncontrolled] = useState(false);
+  const isChatOpenResolved = onIsChatOpenChange ? isChatOpen : isChatOpenUncontrolled;
   const {
     microphoneTrack,
     cameraToggle,
@@ -296,12 +297,12 @@ export function AgentControlBar({
     >
       <motion.div
         {...MOTION_PROPS}
-        inert={!(isChatOpen || isChatOpenUncontrolled)}
-        animate={isChatOpen || isChatOpenUncontrolled ? 'visible' : 'hidden'}
+        inert={!isChatOpenResolved}
+        animate={isChatOpenResolved ? 'visible' : 'hidden'}
         className="border-input/50 flex w-full items-start overflow-hidden border-b"
       >
         <AgentChatInput
-          chatOpen={isChatOpen || isChatOpenUncontrolled}
+          chatOpen={isChatOpenResolved}
           onSend={handleSendMessage}
           className={cn(variant === 'livekit' && '[&_button]:rounded-full')}
         />
@@ -370,11 +371,11 @@ export function AgentControlBar({
           {visibleControls.chat && (
             <Toggle
               variant={variant === 'outline' ? 'outline' : 'default'}
-              pressed={isChatOpen || isChatOpenUncontrolled}
+              pressed={isChatOpenResolved}
               aria-label="Toggle transcript"
               onPressedChange={(state) => {
-                if (!onIsChatOpenChange) setIsChatOpenUncontrolled(state);
-                else onIsChatOpenChange(state);
+                if (onIsChatOpenChange) onIsChatOpenChange(state);
+                else setIsChatOpenUncontrolled(state);
               }}
               className={agentTrackToggleVariants({
                 variant: variant === 'outline' ? 'outline' : 'default',
