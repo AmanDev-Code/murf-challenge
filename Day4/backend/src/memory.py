@@ -64,35 +64,60 @@ async def lookup_user(user_id: str) -> dict[str, Any] | None:
         if not user_row:
             return None
 
-        # Fetch all facts
-        fact_rows = await conn.fetch(
-            "SELECT fact_key, fact_value, updated_at FROM user_facts WHERE user_id = $1 ORDER BY updated_at DESC",
-            user_id,
+        return await _build_user_dict(conn, user_row)
+
+
+async def lookup_user_by_name(name: str) -> dict[str, Any] | None:
+    """
+    Look up a user by name (case-insensitive). Returns the most recently
+    active user with that name. Used when participant ID doesn't match
+    (random IDs change every session).
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        user_row = await conn.fetchrow(
+            "SELECT * FROM users WHERE LOWER(name) = LOWER($1) ORDER BY last_interaction DESC LIMIT 1",
+            name,
         )
+        if not user_row:
+            return None
 
-        # Fetch last conversation summary
-        last_conv = await conn.fetchrow(
-            "SELECT summary, topics, created_at FROM conversation_summaries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
-            user_id,
-        )
+        return await _build_user_dict(conn, user_row)
 
-        facts = {row["fact_key"]: row["fact_value"] for row in fact_rows}
 
-        return {
-            "user_id": user_row["user_id"],
-            "name": user_row["name"],
-            "language_pref": user_row["language_pref"],
-            "persona_pref": user_row["persona_pref"],
-            "total_calls": user_row["total_calls"],
-            "last_interaction": user_row["last_interaction"].isoformat() if user_row["last_interaction"] else None,
-            "consent_given": user_row["consent_given"],
-            "facts": facts,
-            "last_conversation": {
-                "summary": last_conv["summary"],
-                "topics": list(last_conv["topics"]) if last_conv["topics"] else [],
-                "date": last_conv["created_at"].isoformat(),
-            } if last_conv else None,
-        }
+async def _build_user_dict(conn: Any, user_row: Any) -> dict[str, Any]:
+    """Build user dict with facts and last conversation from a DB row."""
+    user_id = user_row["user_id"]
+
+    # Fetch all facts
+    fact_rows = await conn.fetch(
+        "SELECT fact_key, fact_value, updated_at FROM user_facts WHERE user_id = $1 ORDER BY updated_at DESC",
+        user_id,
+    )
+
+    # Fetch last conversation summary
+    last_conv = await conn.fetchrow(
+        "SELECT summary, topics, created_at FROM conversation_summaries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
+        user_id,
+    )
+
+    facts = {row["fact_key"]: row["fact_value"] for row in fact_rows}
+
+    return {
+        "user_id": user_row["user_id"],
+        "name": user_row["name"],
+        "language_pref": user_row["language_pref"],
+        "persona_pref": user_row["persona_pref"],
+        "total_calls": user_row["total_calls"],
+        "last_interaction": user_row["last_interaction"].isoformat() if user_row["last_interaction"] else None,
+        "consent_given": user_row["consent_given"],
+        "facts": facts,
+        "last_conversation": {
+            "summary": last_conv["summary"],
+            "topics": list(last_conv["topics"]) if last_conv["topics"] else [],
+            "date": last_conv["created_at"].isoformat(),
+        } if last_conv else None,
+    }
 
 
 # =============================================================================

@@ -76,6 +76,7 @@ from memory import (
     forget_user,
     get_pool,
     lookup_user,
+    lookup_user_by_name,
     save_conversation_summary,
     save_facts,
     save_user,
@@ -1478,6 +1479,50 @@ class VoicePayAgent(Agent):
         except Exception as e:
             logger.exception("save_conversation_topic failed")
             return {"saved": False, "error": str(e)}
+
+    @function_tool
+    async def lookup_caller(
+        self,
+        context: RunContext,
+        caller_name: str,
+    ) -> str:
+        """Look up a caller by name to check if they've called before.
+
+        Call this when:
+        - User says their name and you want to check if you know them
+        - User asks "do you remember me?" or "what's my name?"
+        - At the start of conversation when user identifies themselves
+
+        Args:
+            caller_name: The name to search for in the database.
+        """
+        self.stats.bump_tool("lookup_caller")
+        try:
+            user_data = await lookup_user_by_name(caller_name)
+            if user_data:
+                # Found! Update internal state
+                self._user_memory = user_data
+                self._user_id = user_data["user_id"]
+                self._consent_given = user_data.get("consent_given", False)
+                name = user_data.get("name", caller_name)
+                facts = user_data.get("facts", {})
+                total_calls = user_data.get("total_calls", 1)
+                last_conv = user_data.get("last_conversation")
+
+                result = f"FOUND: This is a returning caller! Name: {name}, total calls: {total_calls}."
+                if facts:
+                    result += f" Known facts: {', '.join(f'{k}={v}' for k, v in facts.items())}."
+                if last_conv and last_conv.get("summary"):
+                    result += f" Last conversation: {last_conv['summary']}."
+                if last_conv and last_conv.get("topics"):
+                    result += f" Topics discussed before: {', '.join(last_conv['topics'])}."
+                result += " Greet them warmly by name and reference what you know about them!"
+                return result
+            else:
+                return f"NOT FOUND: No record of anyone named '{caller_name}'. This is a new caller. Ask their name and offer to remember it."
+        except Exception as e:
+            logger.exception("lookup_caller failed")
+            return f"ERROR looking up caller: {str(e)}. Proceed normally without memory context."
 
     @function_tool
     async def forget_me(
