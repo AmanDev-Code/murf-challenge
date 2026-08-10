@@ -453,6 +453,31 @@ proper regulatory channels."
   - After forget_me: "Done. All your data is deleted."
   NEVER return nothing after a tool call. ALWAYS speak.
 
+## MANDATORY — Visual Card Display (show_visual_card tool):
+Users are on phones and laptops. They CANNOT hold numbers or lists in their head
+while you speak. THEREFORE, whenever you speak ANY of the following, you MUST
+also call the show_visual_card tool to display it visually:
+  - Any rupee amount, rate, or percentage (EMI, interest, balance, price)
+  - Any comparison or ranking (best FD, cheapest loan, scheme options)
+  - Any list of items (documents needed, steps to follow, schemes eligible)
+  - Any calculation breakdown (principal vs interest, tax benefit)
+  - Any data with multiple values (RBI rates, gold prices in different karats)
+
+Rules for show_visual_card:
+1. Call it IMMEDIATELY after (or in parallel with) the data-fetching tool
+2. Use a clear title the user recognises ("Home Loan EMI", "Gold Rate Today")
+3. Include ALL the numbers/data in the content field — do NOT truncate
+4. After calling it, briefly say "aapki screen pe dikha diya hai" or
+   "I've shown it on your screen — see the panel on the right"
+5. Do NOT skip this even for simple answers. If you speak a number, show it.
+
+Note: Tools like scheme_eligibility, rbi_rates, gold_silver_prices,
+fd_rate_comparison, loan_eligibility, and document_checklist ALREADY push
+visual cards automatically — you do NOT need to call show_visual_card again
+for them. Use show_visual_card ONLY for ad-hoc calculations, custom answers,
+or when other tools didn't cover the visual (e.g. explaining a specific
+scheme in detail, showing a breakdown you computed manually).
+
 ## Speech Rules:
 - Maximum 20 words per sentence. Break long ideas into short sentences.
 - Maximum 3-4 sentences per response (unless a tool returns detailed data)
@@ -1739,6 +1764,45 @@ class VoicePayAgent(Agent):
             "product": product, "result_text": result[:500],
         })
         return result
+
+    @function_tool
+    async def show_visual_card(
+        self,
+        context: RunContext,
+        card_type: str,
+        title: str,
+        content: str,
+    ) -> str:
+        """Display a visual card on the user's screen. Call this WHENEVER you compute
+        or explain something visual — numbers, comparisons, breakdowns, lists, rates,
+        prices, EMI, eligibility results, document lists — ANYTHING the user would
+        benefit from seeing on screen.
+
+        This is ESSENTIAL: users are on phones/laptops and cannot hold numbers in
+        their head. Every time you speak a rate, amount, breakdown, or list, you MUST
+        call this tool to show the visual card. Do NOT skip this even for simple
+        answers.
+
+        Args:
+            card_type: One of 'balance', 'emi', 'gold_prices', 'rbi_rates',
+                'fd_comparison', 'loan_eligibility', 'scheme_eligibility',
+                'documents', 'table', 'steps', 'scheme', 'info'.
+            title: Short title for the card (e.g. "Home Loan EMI", "Gold Rates Today").
+            content: Full text content to display on the card, formatted with line
+                breaks. Include the numbers, comparison, breakdown — everything
+                the user needs to see.
+
+        Returns:
+            Confirmation string. After calling this, briefly narrate what you just
+            showed on screen.
+        """
+        self.stats.bump_tool("show_visual_card")
+        await self._push_visual(card_type, {
+            "title": title,
+            "result_text": content[:800],
+        })
+        return f"CARD SHOWN: '{title}' is now visible on the user's screen. Briefly tell them 'aapki screen pe dikha diya hai' or 'I've shown it on your screen' and then continue naturally."
+
 
 # =============================================================================
 # SERVER + SESSION WIRING
