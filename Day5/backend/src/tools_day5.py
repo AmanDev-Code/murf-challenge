@@ -25,11 +25,17 @@ import asyncio
 import logging
 import os
 import re
+import ssl
 import time
 from datetime import datetime
 from typing import Any
 
+import certifi
+
 logger = logging.getLogger("voicepay.tools")
+
+# SSL context for aiohttp (macOS Python 3.13 fix)
+_SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
 # ---------------------------------------------------------------------------
 # Local datasets — real eligibility criteria, rates, checklists
@@ -234,7 +240,7 @@ async def get_rbi_rates() -> str:
         try:
             import aiohttp
             async with asyncio.timeout(5):
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=_SSL_CTX)) as session:
                     # Try RBI's published data endpoint
                     url = "https://api.rbi.org.in/v1/rates/policy"
                     headers = {"Authorization": f"Bearer {api_key}"}
@@ -315,7 +321,7 @@ async def get_gold_silver_prices() -> str:
         try:
             import aiohttp
             async with asyncio.timeout(5):
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=_SSL_CTX)) as session:
                     # GoldAPI.io endpoint for INR gold price
                     url = "https://www.goldapi.io/api/XAU/INR"
                     headers = {
@@ -347,7 +353,7 @@ async def get_gold_silver_prices() -> str:
         try:
             import aiohttp
             async with asyncio.timeout(5):
-                async with aiohttp.ClientSession() as session:
+                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=_SSL_CTX)) as session:
                     url = "https://www.goldapi.io/api/XAG/INR"
                     headers = {
                         "x-access-token": api_key,
