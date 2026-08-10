@@ -232,30 +232,57 @@ async def get_rbi_rates() -> str:
         return cached
 
     result_data = None
-    source = "cache"
+    source = "cache (IBJA/RBI website)"
+    live_repo_rate = None
+    live_repo_date = None
 
-    # --- Attempt live fetch (with 5-second timeout) ---
-    api_key = os.environ.get("RBI_API_KEY", "")
+    # --- Attempt live fetch from data.gov.in (with 5-second timeout) ---
+    api_key = os.environ.get("DATA_GOV_IN_API_KEY", "") or os.environ.get("RBI_API_KEY", "")
     if api_key:
         try:
             import aiohttp
             async with asyncio.timeout(5):
                 async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=_SSL_CTX)) as session:
-                    # Try RBI's published data endpoint
-                    url = "https://api.rbi.org.in/v1/rates/policy"
-                    headers = {"Authorization": f"Bearer {api_key}"}
-                    async with session.get(url, headers=headers) as resp:
+                    # data.gov.in — RBI repo rate history dataset
+                    url = "https://api.data.gov.in/resource/fbc6c424-c841-4804-84ce-63effa215165"
+                    params = {
+                        "api-key": api_key,
+                        "format": "json",
+                        "limit": "10",
+                        "offset": "0",
+                    }
+                    async with session.get(url, params=params) as resp:
                         if resp.status == 200:
                             data = await resp.json()
-                            if data and isinstance(data, dict):
-                                result_data = data
-                                source = "live"
-        except Exception:
-            logger.debug("RBI live API unavailable — using cached rates")
+                            records = data.get("records", []) if isinstance(data, dict) else []
+                            if records:
+                                # Get most recent record (latest repo rate)
+                                latest = records[-1]
+                                # Field names from data.gov.in schema
+                                rate_key = "repo_rate__in_percent_"
+                                date_key = "date"
+                                if rate_key in latest:
+                                    live_repo_rate = float(latest[rate_key])
+                                    live_repo_date = latest.get(date_key, "unknown")
+                                    source = f"data.gov.in (live, dataset: RBI repo rate history)"
+                                    logger.info(
+                                        "RBI live fetch: repo=%s%% date=%s",
+                                        live_repo_rate, live_repo_date,
+                                    )
+        except Exception as e:
+            logger.debug("RBI data.gov.in API unavailable (%s) — using cached rates", e)
 
-    # --- Fall back to cached data ---
-    if result_data is None:
-        result_data = RBI_RATES_CACHE
+    # --- Fall back to cached data (RBI current values) ---
+    result_data = dict(RBI_RATES_CACHE)  # copy so we can override
+
+    # If live fetch got a repo rate, patch it in
+    if live_repo_rate is not None:
+        if isinstance(result_data.get("repo_rate"), dict):
+            result_data["repo_rate"]["value"] = live_repo_rate
+        else:
+            result_data["repo_rate"] = live_repo_rate
+        if live_repo_date:
+            result_data["last_mpc_date"] = live_repo_date
 
     # --- Build response ---
     lines = [
