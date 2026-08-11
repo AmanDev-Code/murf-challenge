@@ -18,7 +18,7 @@ import logging
 import os
 import ssl
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import certifi
@@ -368,8 +368,8 @@ async def entrypoint(ctx: JobContext):
                 sip_trunk_id=OUTBOUND_TRUNK_ID,
                 sip_call_to=sip_call_to,
                 participant_identity=phone_number,
-                ringing_timeout=30,  # Wait 30 seconds for answer before giving up
-                max_call_duration=300,  # 5 minute max call
+                ringing_timeout=timedelta(seconds=30),
+                max_call_duration=timedelta(seconds=300),
             )
         )
 
