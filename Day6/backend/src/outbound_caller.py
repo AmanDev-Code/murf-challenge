@@ -83,6 +83,7 @@ class OutboundCallerAgent(Agent):
         purpose: str,
         language: str = "en",
         persona_name: str = "Anisha",
+        gender: str = "female",
         facts: dict[str, Any] | None = None,
         user_id: str | None = None,
         metadata: dict[str, Any] | None = None,
@@ -92,6 +93,7 @@ class OutboundCallerAgent(Agent):
         self._purpose = purpose
         self._language = language
         self._persona_name = persona_name
+        self._gender = gender
         self._facts = facts or {}
         self._user_id = user_id
         self._metadata = metadata or {}
@@ -110,7 +112,7 @@ class OutboundCallerAgent(Agent):
             purpose=purpose,
             language=language,
             facts=facts,
-            gender=persona.get("gender", "female"),
+            gender=self._gender,
             **extra_kwargs,
         )
 
@@ -313,6 +315,7 @@ async def entrypoint(ctx: JobContext):
         purpose=purpose,
         language=language,
         persona_name=persona_name,
+        gender=persona.get("gender", "female"),
         facts=facts,
         user_id=user_id,
         metadata=metadata,
