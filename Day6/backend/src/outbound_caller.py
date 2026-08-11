@@ -381,6 +381,13 @@ async def entrypoint(ctx: JobContext):
         agent.set_participant(participant)
         logger.info("Participant connected: %s — conversation starting", phone_number)
 
+        # --- Monitor for participant disconnect (user hangs up) ---
+        @ctx.room.on("participant_disconnected")
+        def _on_disconnect(p: rtc.RemoteParticipant):
+            if p.identity == phone_number:
+                logger.info("USER HUNG UP: %s — ending session", phone_number)
+                asyncio.create_task(agent._hangup("answered", "User hung up"))
+
     except Exception as e:
         # --- Handle call failure ---
         error_str = str(e)

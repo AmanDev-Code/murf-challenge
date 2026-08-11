@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Phone, PhoneCall, PhoneOff, Loader2, CheckCircle2, XCircle, Delete,
   FileText, Banknote, Building2, ShieldAlert, RefreshCw,
-  User, Mic, X,
+  User, Mic, X, ClipboardList,
 } from 'lucide-react';
 
 type CallStatus = 'idle' | 'dispatching' | 'ringing' | 'connected' | 'ended' | 'error';
