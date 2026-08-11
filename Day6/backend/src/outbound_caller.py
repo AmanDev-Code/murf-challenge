@@ -317,12 +317,14 @@ async def entrypoint(ctx: JobContext):
         metadata=metadata,
     )
 
-    # --- Build session pipeline (same quality as inbound) ---
+    # --- Build session pipeline (tuned for TELEPHONY audio — 8kHz narrowband) ---
     session = AgentSession(
         stt=deepgram.STT(
             model="nova-3",
             language="multi",
             smart_format=True,
+            sample_rate=8000,  # Phone audio is 8kHz, not 48kHz
+            encoding="linear16",
         ),
         llm=google.LLM(
             model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite"),
@@ -332,14 +334,14 @@ async def entrypoint(ctx: JobContext):
             voice=persona["voice"],
             style=persona["style"],
             model="falcon-2",
-            sample_rate=48000,
+            sample_rate=8000,  # Match phone audio rate
             locale=persona["locale"],
             speed=0,
             pitch=0,
             tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
             text_pacing=False,
         ),
-        turn_detection=MultilingualModel(unlikely_threshold=0.3),
+        turn_detection=MultilingualModel(unlikely_threshold=0.5),  # Less sensitive for noisy phone
         vad=ctx.proc.userdata.get("vad"),
         preemptive_generation=True,
     )
