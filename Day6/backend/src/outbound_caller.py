@@ -272,12 +272,17 @@ async def entrypoint(ctx: JobContext):
     user_id = metadata.get("user_id")
 
     # --- Route to Linphone SIP URI ---
-    # When using Linphone trunk, convert any phone number to the SIP URI
-    # This way the dialer accepts phone numbers but the call goes to Linphone app
+    # When using Linphone trunk, convert any phone number to just the SIP username
+    # The trunk already knows the domain (sip.linphone.org), so we only pass the user part
     linphone_uri = os.environ.get("LINPHONE_SIP_URI", "")
     if linphone_uri and not phone_number.startswith("sip:"):
-        sip_call_to = linphone_uri
-        logger.info("Routing %s → %s (Linphone SIP)", phone_number, sip_call_to)
+        # Extract just the username from sip:aman021998@sip.linphone.org → aman021998
+        sip_user = linphone_uri.replace("sip:", "").split("@")[0]
+        sip_call_to = sip_user
+        logger.info("Routing %s → %s (Linphone SIP user)", phone_number, sip_call_to)
+    elif phone_number.startswith("sip:"):
+        # Full SIP URI passed — extract just the user part
+        sip_call_to = phone_number.replace("sip:", "").split("@")[0]
     else:
         sip_call_to = phone_number
 
