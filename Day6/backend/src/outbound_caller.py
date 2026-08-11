@@ -99,13 +99,18 @@ class OutboundCallerAgent(Agent):
         self._participant: rtc.RemoteParticipant | None = None
 
         # Build the outbound system prompt
+        # Filter metadata to only include extra fields not already passed as named args
+        excluded_keys = {'user_name', 'persona_name', 'purpose', 'language', 'facts',
+                         'phone_number', 'persona', 'user_id', 'attempt', 'triggered_at'}
+        extra_kwargs = {k: v for k, v in (metadata or {}).items()
+                        if isinstance(v, str) and k not in excluded_keys}
         instructions = build_outbound_system_prompt(
             persona_name=persona_name,
             user_name=user_name,
             purpose=purpose,
             language=language,
             facts=facts,
-            **{k: v for k, v in (metadata or {}).items() if isinstance(v, str)},
+            **extra_kwargs,
         )
 
         super().__init__(instructions=instructions)
