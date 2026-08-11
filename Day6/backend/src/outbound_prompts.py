@@ -12,46 +12,46 @@ from __future__ import annotations
 PURPOSE_TEMPLATES = {
     "scheme_reminder": {
         "en": (
-            "You called because {user_name} previously asked about {scheme_name}. "
-            "The deadline for this scheme is approaching on {deadline_date}. "
-            "Help them understand next steps to apply before the deadline."
+            "You called because {user_name} previously asked about government schemes. "
+            "Remind them that scheme application windows close periodically and they should apply soon. "
+            "Help them understand next steps. Do NOT mention a specific date unless you have one."
         ),
         "hi": (
-            "आपने {user_name} को इसलिए call किया क्योंकि उन्होंने पहले {scheme_name} के बारे में पूछा था। "
-            "इस योजना की अंतिम तिथि {deadline_date} को आ रही है। "
-            "उन्हें deadline से पहले apply करने में मदद करें।"
+            "आपने {user_name} को इसलिए call किया क्योंकि उन्होंने पहले सरकारी योजनाओं के बारे में पूछा था। "
+            "उन्हें बताएं कि apply करने का समय निकल सकता है। "
+            "अगर कोई specific date नहीं है तो 'जल्दी apply करें' बोलें।"
         ),
-        "opening_en": "You had asked about {scheme_name} last time — the deadline is coming up on {deadline_date}.",
-        "opening_hi": "आपने पिछली बार {scheme_name} के बारे में पूछा था — उसकी deadline {deadline_date} को है।",
+        "opening_en": "You had asked about government schemes last time — wanted to remind you to apply before the window closes.",
+        "opening_hi": "आपने पिछली बार सरकारी योजनाओं के बारे में पूछा था — बस याद दिलाना था कि जल्दी apply कर लें।",
     },
     "emi_reminder": {
         "en": (
             "You called to remind {user_name} about their upcoming EMI payment. "
-            "Their EMI of {emi_amount} is due on {due_date}. "
-            "Confirm they're aware and offer help if they have questions about the payment."
+            "Just a friendly reminder that their EMI is due soon. "
+            "Ask if they need help with anything related to their loan."
         ),
         "hi": (
             "{user_name} को उनकी EMI payment की reminder देने के लिए call किया। "
-            "उनकी {emi_amount} की EMI {due_date} को due है।"
+            "बस बताना था कि EMI जल्दी due है।"
         ),
-        "opening_en": "Your EMI payment of {emi_amount} is due on {due_date}. Just a friendly reminder.",
-        "opening_hi": "आपकी {emi_amount} की EMI {due_date} को due है — बस एक friendly reminder।",
+        "opening_en": "Just a friendly reminder — your EMI payment is coming up soon.",
+        "opening_hi": "बस एक friendly reminder — आपकी EMI जल्दी due है। सब ठीक है ना?",
     },
     "fd_maturity": {
         "en": (
-            "You called because {user_name}'s Fixed Deposit is maturing on {maturity_date}. "
-            "The amount is {fd_amount}. Help them decide whether to renew, withdraw, or reinvest."
+            "You called because {user_name}'s Fixed Deposit is maturing soon. "
+            "Help them decide whether to renew, withdraw, or reinvest."
         ),
         "hi": (
-            "{user_name} की FD {maturity_date} को mature हो रही है। "
-            "Amount है {fd_amount}। Renew करें, withdraw करें, या reinvest — decide करने में help करें।"
+            "{user_name} की FD जल्दी mature होने वाली है। "
+            "Renew करें, withdraw करें, या reinvest — decide करने में help करें।"
         ),
-        "opening_en": "Your Fixed Deposit of {fd_amount} is maturing on {maturity_date}. Would you like to renew or withdraw?",
-        "opening_hi": "आपकी {fd_amount} की FD {maturity_date} को mature हो रही है — renew करना है या withdraw?",
+        "opening_en": "Your Fixed Deposit is maturing soon. Would you like to renew or withdraw?",
+        "opening_hi": "आपकी FD जल्दी mature होने वाली है — renew करना है या withdraw?",
     },
     "scam_alert": {
         "en": (
-            "You called to warn {user_name} about a trending scam in their area. "
+            "You called to warn {user_name} about a trending scam. "
             "Explain the scam pattern clearly and tell them how to stay safe. "
             "This is a PUBLIC SERVICE — not a sales pitch."
         ),
@@ -59,21 +59,21 @@ PURPOSE_TEMPLATES = {
             "{user_name} को एक trending scam के बारे में warn करने के लिए call किया। "
             "Scam pattern clearly explain करें और safe रहने का तरीका बताएं।"
         ),
-        "opening_en": "We wanted to alert you about a new scam targeting people in your area. This is important.",
-        "opening_hi": "हम आपको एक नए scam के बारे में alert करना चाहते थे जो आपके area में चल रहा है।",
+        "opening_en": "We wanted to alert you about a new scam targeting people. This is important for your safety.",
+        "opening_hi": "हम आपको एक नए scam के बारे में alert करना चाहते थे — आपकी safety के लिए important है।",
     },
     "follow_up": {
         "en": (
-            "You called to follow up with {user_name} about {topic}. "
-            "Last time you discussed this topic and promised to check back. "
+            "You called to follow up with {user_name}. "
+            "Last time you discussed a topic and promised to check back. "
             "Ask how things went and if they need further help."
         ),
         "hi": (
-            "{user_name} से {topic} के बारे में follow up करने call किया। "
-            "पिछली बार इस topic पर बात हुई थी।"
+            "{user_name} से follow up करने call किया। "
+            "पिछली बार बात हुई थी — check कर रहे थे सब ठीक हुआ या नहीं।"
         ),
-        "opening_en": "Last time we talked about {topic}. Just checking in — did everything work out?",
-        "opening_hi": "पिछली बार हमने {topic} पर बात की थी — बस check कर रहे थे, सब ठीक हुआ?",
+        "opening_en": "Last time we talked, just checking in — did everything work out?",
+        "opening_hi": "पिछली बार हमने बात की थी — बस check कर रहे थे, सब ठीक हुआ?",
     },
     "general_reminder": {
         "en": (
@@ -83,8 +83,8 @@ PURPOSE_TEMPLATES = {
         "hi": (
             "{user_name} को एक general financial reminder देने के लिए call किया।"
         ),
-        "opening_en": "We have an important update for you regarding your finances.",
-        "opening_hi": "आपकी finances के बारे में एक important update है।",
+        "opening_en": "We have a quick update for you regarding your finances.",
+        "opening_hi": "आपके finances के बारे में एक quick update है।",
     },
 }
 
