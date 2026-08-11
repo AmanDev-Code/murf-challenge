@@ -220,6 +220,13 @@ export function OutboundTrigger() {
     setActiveRoom(null);
   };
 
+  // Stop ring tone when status changes away from ringing
+  useEffect(() => {
+    if (status !== 'ringing') {
+      ringTone.stop();
+    }
+  }, [status, ringTone]);
+
   // Auto-reset UI after 60 seconds if still showing "Calling" (call ended on backend but UI didn't know)
   useEffect(() => {
     if (status === 'ringing' || status === 'connected') {
@@ -227,10 +234,11 @@ export function OutboundTrigger() {
         setStatus('ended');
         setMessage('Call ended');
         setActiveRoom(null);
+        ringTone.stop();
       }, 120000); // 2 min max
       return () => clearTimeout(timer);
     }
-  }, [status]);
+  }, [status, ringTone]);
 
   // Floating button when closed
   if (!isOpen) {
