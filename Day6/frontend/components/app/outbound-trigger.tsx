@@ -157,7 +157,15 @@ export function OutboundTrigger() {
         setStatus('ringing');
         setActiveRoom(data.room_name || null);
         setMessage(`Calling ${userName || phone}`);
-        ringTone.start(); // Start ringing sound on web
+        ringTone.start();
+
+        // Stop ringing after 5 seconds (typical answer time)
+        // Call is connected by then — agent starts speaking
+        setTimeout(() => {
+          ringTone.stop();
+          setStatus('connected');
+          setMessage(`Connected to ${userName || phone}`);
+        }, 5000);
       } else {
         setStatus('error');
         setMessage(data.message || 'Failed to dispatch');
