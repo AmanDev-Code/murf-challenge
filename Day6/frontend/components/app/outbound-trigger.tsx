@@ -158,31 +158,6 @@ export function OutboundTrigger() {
         setActiveRoom(data.room_name || null);
         setMessage(`Calling ${userName || phone}`);
         ringTone.start(); // Start ringing sound on web
-
-        // Poll room status — auto-reset when call ends
-        const roomName = data.room_name;
-        if (roomName) {
-          const pollInterval = setInterval(async () => {
-            try {
-              const check = await fetch(`/api/outbound/hangup`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ room_name: roomName }),
-              });
-              const checkData = await check.json();
-              // If room is already gone (404/ended), call ended
-              if (checkData.message?.includes('already ended')) {
-                clearInterval(pollInterval);
-                setStatus('ended');
-                setMessage('Call ended');
-                setActiveRoom(null);
-              }
-            } catch { /* ignore */ }
-          }, 5000); // Check every 5 seconds
-
-          // Cleanup interval on unmount or status change
-          setTimeout(() => clearInterval(pollInterval), 300000); // max 5 min
-        }
       } else {
         setStatus('error');
         setMessage(data.message || 'Failed to dispatch');
