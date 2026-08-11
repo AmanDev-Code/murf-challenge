@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Phone, PhoneCall, Loader2, CheckCircle2, XCircle, Delete,
+  Phone, PhoneCall, PhoneOff, Loader2, CheckCircle2, XCircle, Delete,
   FileText, Banknote, Building2, ShieldAlert, RefreshCw,
   User, Mic, X,
 } from 'lucide-react';
@@ -18,6 +18,7 @@ export function OutboundTrigger() {
   const [message, setMessage] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [pressedKey, setPressedKey] = useState<string | null>(null);
+  const [activeRoom, setActiveRoom] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const purposes = [
@@ -98,11 +99,12 @@ export function OutboundTrigger() {
 
       if (res.ok && data.status === 'dispatched') {
         setStatus('ringing');
+        setActiveRoom(data.room_name || null);
         setMessage(`Calling ${userName || phone}`);
+        // Auto-mark as connected after 10s (LiveKit doesn't push status to frontend)
         setTimeout(() => {
-          setStatus('ended');
-          setMessage('Call completed');
-        }, 30000);
+          if (status === 'ringing') setStatus('connected');
+        }, 10000);
       } else {
         setStatus('error');
         setMessage(data.message || 'Failed to dispatch');
@@ -111,6 +113,29 @@ export function OutboundTrigger() {
       setStatus('error');
       setMessage('Trigger API offline');
     }
+  };
+
+  const endCall = async () => {
+    if (!activeRoom) {
+      setStatus('ended');
+      setMessage('Call ended');
+      setActiveRoom(null);
+      return;
+    }
+
+    try {
+      await fetch('/api/outbound/hangup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room_name: activeRoom }),
+      });
+    } catch {
+      // Even if API fails, reset UI
+    }
+
+    setStatus('ended');
+    setMessage('Call ended');
+    setActiveRoom(null);
   };
 
   // Floating button when closed
@@ -281,31 +306,31 @@ export function OutboundTrigger() {
         </div>
       )}
 
-      {/* Call Button */}
+      {/* Call / End Button */}
       <div className="px-5 pb-5">
-        <button
-          onClick={triggerCall}
-          disabled={status === 'dispatching' || status === 'ringing'}
-          className={`group relative flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold tracking-wide shadow-lg transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden ${
-            status === 'ringing'
-              ? 'bg-emerald-500 text-white shadow-emerald-500/20'
-              : 'bg-gradient-to-r from-[#f5a623] to-[#e8961f] text-[#0a0e1a] shadow-[#f5a623]/20 hover:shadow-[#f5a623]/30'
-          }`}
-        >
-          {/* Shimmer effect */}
-          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
-          {status === 'dispatching' ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : status === 'ringing' ? (
-            <PhoneCall className="h-5 w-5 animate-bounce" />
-          ) : (
-            <Phone className="h-5 w-5" />
-          )}
-          <span>
-            {status === 'ringing' ? 'Ringing...' : status === 'dispatching' ? 'Connecting...' : 'Call Now'}
-          </span>
-        </button>
+        {(status === 'ringing' || status === 'connected') ? (
+          <button
+            onClick={endCall}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-500 py-3.5 text-sm font-bold tracking-wide text-white shadow-lg shadow-red-500/20 transition-all duration-200 active:scale-95 hover:bg-red-600"
+          >
+            <PhoneOff className="h-5 w-5" />
+            <span>End Call</span>
+          </button>
+        ) : (
+          <button
+            onClick={triggerCall}
+            disabled={status === 'dispatching'}
+            className={`group relative flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold tracking-wide shadow-lg transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden bg-gradient-to-r from-[#f5a623] to-[#e8961f] text-[#0a0e1a] shadow-[#f5a623]/20 hover:shadow-[#f5a623]/30`}
+          >
+            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+            {status === 'dispatching' ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Phone className="h-5 w-5" />
+            )}
+            <span>{status === 'dispatching' ? 'Connecting...' : 'Call Now'}</span>
+          </button>
+        )}
       </div>
     </div>
   );
