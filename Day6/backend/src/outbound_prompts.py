@@ -95,12 +95,23 @@ def build_outbound_system_prompt(
     purpose: str,
     language: str = "en",
     facts: dict | None = None,
+    gender: str = "female",
     **kwargs,
 ) -> str:
     """Build a complete outbound system prompt for the given purpose."""
 
     template = PURPOSE_TEMPLATES.get(purpose, PURPOSE_TEMPLATES["general_reminder"])
     lang_key = "hi" if language in ("hi", "hindi", "hinglish") else "en"
+
+    # Gender-aware Hindi verb forms
+    if gender == "male":
+        bol_raha = "बोल रहा हूँ"
+        kar_sakta = "कर सकता हूँ"
+        pronoun_ref = "he/him"
+    else:
+        bol_raha = "बोल रही हूँ"
+        kar_sakta = "कर सकती हूँ"
+        pronoun_ref = "she/her"
 
     # Format the purpose context with available kwargs
     format_vars = {"user_name": user_name, "persona_name": persona_name, **(facts or {}), **kwargs}
@@ -114,16 +125,18 @@ def build_outbound_system_prompt(
     return f"""
 # IDENTITY — OUTBOUND CALL
 You are {persona_name} from VoicePay. You are making an OUTBOUND call to {user_name}.
-You are an AI voice assistant — NOT a human. If asked, say so honestly.
+You are a {"MALE" if gender == "male" else "FEMALE"} AI voice assistant — NOT a human. If asked, say so honestly.
+Your gender is {"male (पुरुष)" if gender == "male" else "female (स्त्री)"} — use {"masculine" if gender == "male" else "feminine"} verb forms in Hindi.
 
 # LANGUAGE & SCRIPT — CRITICAL FOR TTS QUALITY
 - ALWAYS write Hindi in DEVANAGARI script (नमस्ते, not "Namaste")
 - NEVER use romanized Hindi — TTS reads it as English and sounds terrible
 - Keep sentences SHORT (max 8-10 words) for natural TTS rhythm
 - Use conversational Hindi, NOT textbook Hindi
+- GENDER: You are {"male" if gender == "male" else "female"}. Use {"masculine (रहा, करता, बोलता, हूँ)" if gender == "male" else "feminine (रही, करती, बोलती, हूँ)"} forms ALWAYS.
 
 # CRITICAL OPENING (FIRST 2 SENTENCES — SAY IN DEVANAGARI):
-Your FIRST sentence must be: "नमस्ते {user_name}, मैं {persona_name} बोल रही हूँ VoicePay से।"
+Your FIRST sentence must be: "नमस्ते {user_name}, मैं {persona_name} {bol_raha} VoicePay से।"
 Your SECOND sentence must explain WHY: "{opening_line}"
 Your THIRD sentence must be: "दो मिनट दे सकते हैं? अगर आप नहीं चाहते कि हम call करें, तो बस 'don't call again' बोल दीजिए।"
 
