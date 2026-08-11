@@ -1,6 +1,6 @@
 """
-VoicePay — Outbound SIP Trunk Setup (One-time)
-Creates a LiveKit outbound SIP trunk pointing to Twilio.
+VoicePay — Outbound SIP Trunk Setup for Linphone
+Creates a LiveKit outbound SIP trunk pointing to sip.linphone.org.
 Run once, then copy the trunk ID to .env.local.
 
 Usage:
@@ -23,34 +23,32 @@ async def main():
     from livekit.protocol.sip import CreateSIPOutboundTrunkRequest, SIPOutboundTrunkInfo
 
     # Validate env vars
-    required = [
-        "LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET",
-        "TWILIO_SIP_USERNAME", "TWILIO_SIP_PASSWORD", "TWILIO_PHONE_NUMBER",
-    ]
+    required = ["LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET"]
     missing = [k for k in required if not os.environ.get(k)]
     if missing:
         print(f"ERROR: Missing env vars: {', '.join(missing)}")
-        print("Add them to .env.local and try again.")
         sys.exit(1)
 
-    # Twilio termination URI: {AccountSID}.pstn.twilio.com
-    account_sid = os.environ.get("TWILIO_ACCOUNT_SID", "")
-    termination_uri = f"{account_sid}.pstn.twilio.com" if account_sid else "pstn.twilio.com"
+    # Linphone SIP server — direct SIP calling, no trunk provider needed
+    sip_address = os.environ.get("LINPHONE_SIP_DOMAIN", "sip.linphone.org")
+    sip_username = os.environ.get("LINPHONE_SIP_USERNAME", "aman021998")
+    sip_password = os.environ.get("LINPHONE_SIP_PASSWORD", "Aman@2802")
+    caller_number = os.environ.get("TWILIO_PHONE_NUMBER", "+17372508034")
 
-    print(f"Creating LiveKit outbound SIP trunk...")
-    print(f"  Termination URI: {termination_uri}")
-    print(f"  Caller ID: {os.environ['TWILIO_PHONE_NUMBER']}")
-    print(f"  Auth user: {os.environ['TWILIO_SIP_USERNAME']}")
+    print(f"Creating LiveKit outbound SIP trunk (Linphone)...")
+    print(f"  SIP Server: {sip_address}")
+    print(f"  Username: {sip_username}")
+    print(f"  Caller ID: {caller_number}")
     print()
 
     lkapi = api.LiveKitAPI()
 
     trunk = SIPOutboundTrunkInfo(
-        name="VoicePay Twilio Outbound",
-        address=termination_uri,
-        numbers=[os.environ["TWILIO_PHONE_NUMBER"]],
-        auth_username=os.environ["TWILIO_SIP_USERNAME"],
-        auth_password=os.environ["TWILIO_SIP_PASSWORD"],
+        name="VoicePay Linphone Outbound",
+        address=sip_address,
+        numbers=[caller_number],
+        auth_username=sip_username,
+        auth_password=sip_password,
     )
 
     try:
@@ -64,6 +62,8 @@ async def main():
         print(f"  SIP_OUTBOUND_TRUNK_ID={trunk_id}")
         print(f"")
         print(f"Add this line to your .env.local file.")
+        print(f"")
+        print(f"To call Linphone, use SIP URI: sip:aman021998@sip.linphone.org")
         print("=" * 60)
     except Exception as e:
         print(f"ERROR creating trunk: {e}")

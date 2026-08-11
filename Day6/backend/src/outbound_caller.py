@@ -271,6 +271,16 @@ async def entrypoint(ctx: JobContext):
     facts = metadata.get("facts", {})
     user_id = metadata.get("user_id")
 
+    # --- Route to Linphone SIP URI ---
+    # When using Linphone trunk, convert any phone number to the SIP URI
+    # This way the dialer accepts phone numbers but the call goes to Linphone app
+    linphone_uri = os.environ.get("LINPHONE_SIP_URI", "")
+    if linphone_uri and not phone_number.startswith("sip:"):
+        sip_call_to = linphone_uri
+        logger.info("Routing %s → %s (Linphone SIP)", phone_number, sip_call_to)
+    else:
+        sip_call_to = phone_number
+
     if not phone_number:
         logger.error("No phone_number in dispatch metadata")
         ctx.shutdown()
@@ -342,13 +352,13 @@ async def entrypoint(ctx: JobContext):
 
     # --- Place the outbound call ---
     try:
-        logger.info("Dialing %s via SIP trunk %s...", phone_number, OUTBOUND_TRUNK_ID)
+        logger.info("Dialing %s via SIP trunk %s...", sip_call_to, OUTBOUND_TRUNK_ID)
 
         await ctx.api.sip.create_sip_participant(
             api.CreateSIPParticipantRequest(
                 room_name=ctx.room.name,
                 sip_trunk_id=OUTBOUND_TRUNK_ID,
-                sip_call_to=phone_number,
+                sip_call_to=sip_call_to,
                 participant_identity=phone_number,
                 wait_until_answered=True,
             )
