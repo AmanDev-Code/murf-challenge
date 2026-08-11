@@ -13,6 +13,7 @@ import { useAgentErrors } from '@/hooks/useAgentErrors';
 import { useDebugMode } from '@/hooks/useDebug';
 import { getSandboxTokenSource } from '@/lib/utils';
 import { LocaleProvider, type Locale } from '@/lib/i18n';
+import { OutboundTrigger } from '@/components/app/outbound-trigger';
 
 const IN_DEVELOPMENT = process.env.NODE_ENV !== 'production';
 
@@ -154,6 +155,7 @@ export function App({ appConfig }: AppProps) {
           />
         </main>
         <StartAudioButton label="Start Audio" />
+        <OutboundTrigger />
         <Toaster
           icons={{
             warning: <WarningIcon weight="bold" />,
