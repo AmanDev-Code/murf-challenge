@@ -411,13 +411,6 @@ async def entrypoint(ctx: JobContext):
         ctx.shutdown()
         return
 
-    # --- Cleanup on session end ---
-    @session.on("close")
-    async def _on_close(*args):
-        logger.info("Session closed for outbound call to %s", phone_number)
-        await close_pool()
-
-
 # =============================================================================
 # WORKER SETUP
 # =============================================================================
