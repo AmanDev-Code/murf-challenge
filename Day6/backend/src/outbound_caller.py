@@ -375,7 +375,7 @@ async def entrypoint(ctx: JobContext):
         await session_task
         logger.info("Call placed! Waiting for participant to answer...")
 
-        participant = await ctx.wait_for_participant(identity=phone_number, timeout=30)
+        participant = await ctx.wait_for_participant(identity=phone_number)
         agent.set_participant(participant)
         logger.info("Participant connected: %s — conversation starting", phone_number)
 
