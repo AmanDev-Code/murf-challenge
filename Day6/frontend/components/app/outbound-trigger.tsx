@@ -9,6 +9,58 @@ import {
 
 type CallStatus = 'idle' | 'dispatching' | 'ringing' | 'connected' | 'ended' | 'error';
 
+interface CallLog {
+  role: 'agent' | 'user';
+  text: string;
+  time: string;
+}
+
+// Ring tone using Web Audio API
+function useRingTone() {
+  const ctxRef = useRef<AudioContext | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const start = useCallback(() => {
+    try {
+      const ctx = new AudioContext();
+      ctxRef.current = ctx;
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+
+      const osc1 = ctx.createOscillator();
+      osc1.frequency.value = 440;
+      osc1.type = 'sine';
+      osc1.connect(gain);
+      osc1.start();
+
+      const osc2 = ctx.createOscillator();
+      osc2.frequency.value = 480;
+      osc2.type = 'sine';
+      osc2.connect(gain);
+      osc2.start();
+
+      // Ring cadence: 1s on, 2s off
+      let on = true;
+      gain.gain.value = 0.1;
+      intervalRef.current = setInterval(() => {
+        on = !on;
+        gain.gain.setTargetAtTime(on ? 0.1 : 0, ctx.currentTime, 0.02);
+      }, on ? 1000 : 2000);
+    } catch { /* no audio context */ }
+  }, []);
+
+  const stop = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (ctxRef.current) {
+      try { ctxRef.current.close(); } catch {}
+    }
+    ctxRef.current = null;
+    intervalRef.current = null;
+  }, []);
+
+  return { start, stop };
+}
+
 export function OutboundTrigger() {
   const [phone, setPhone] = useState('+91');
   const [userName, setUserName] = useState('');
@@ -19,7 +71,11 @@ export function OutboundTrigger() {
   const [isOpen, setIsOpen] = useState(false);
   const [pressedKey, setPressedKey] = useState<string | null>(null);
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
+  const [callLogs, setCallLogs] = useState<CallLog[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const ringTone = useRingTone();
 
   const purposes = [
     { value: 'scheme_reminder', label: 'Scheme', icon: FileText },
@@ -101,6 +157,7 @@ export function OutboundTrigger() {
         setStatus('ringing');
         setActiveRoom(data.room_name || null);
         setMessage(`Calling ${userName || phone}`);
+        ringTone.start(); // Start ringing sound on web
 
         // Poll room status — auto-reset when call ends
         const roomName = data.room_name;
@@ -137,6 +194,8 @@ export function OutboundTrigger() {
   };
 
   const endCall = async () => {
+    ringTone.stop(); // Stop ringing sound
+
     if (!activeRoom) {
       setStatus('ended');
       setMessage('Call ended');
