@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { AccessToken } from 'livekit-server-sdk';
+import { AccessToken, type VideoGrant } from 'livekit-server-sdk';
 
 /**
- * Outbound call trigger — dispatches directly to LiveKit (no separate FastAPI needed).
- * Creates an agent dispatch for "voicepay-outbound" with the phone number in metadata.
+ * Outbound call trigger — dispatches directly to LiveKit.
+ * No separate FastAPI needed.
  */
 
 const LIVEKIT_URL = process.env.LIVEKIT_URL || '';
@@ -29,10 +29,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Build room name for this outbound call
     const roomName = `outbound-${phone_number.replace(/\+/g, '')}-${Date.now()}`;
 
-    // Build metadata payload that the outbound worker reads
     const metadata = JSON.stringify({
       phone_number,
       user_name: user_name || 'User',
@@ -44,15 +42,15 @@ export async function POST(req: Request) {
       triggered_at: new Date().toISOString(),
     });
 
-    // Use LiveKit Server SDK to create agent dispatch
-    // The dispatch tells LiveKit to spin up a room and route it to "voicepay-outbound" worker
+    // Create a proper admin token
+    const token = await createAdminToken(roomName);
     const httpUrl = LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://');
 
     const response = await fetch(`${httpUrl}/twirp/livekit.AgentDispatchService/CreateDispatch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${await createServiceToken()}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
         agent_name: 'voicepay-outbound',
@@ -69,7 +67,6 @@ export async function POST(req: Request) {
         phone_number,
         purpose: purpose || 'general_reminder',
         message: `Call dispatched to ${user_name || phone_number}`,
-        dispatch_id: data.dispatch_id || roomName,
       });
     } else {
       const errText = await response.text().catch(() => 'Unknown error');
@@ -86,25 +83,30 @@ export async function POST(req: Request) {
   }
 }
 
-async function createServiceToken(): Promise<string> {
+async function createAdminToken(roomName: string): Promise<string> {
   const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
-    identity: 'voicepay-trigger',
-    ttl: '1m',
+    identity: 'voicepay-service',
+    ttl: '2m',
   });
-  at.addGrant({
+
+  const grant: VideoGrant = {
+    room: roomName,
     roomCreate: true,
     roomAdmin: true,
     roomJoin: true,
+    roomList: true,
     canPublish: true,
     canSubscribe: true,
-  });
+    canPublishData: true,
+  };
+  at.addGrant(grant);
+
   return await at.toJwt();
 }
 
 export async function GET() {
   return NextResponse.json({
     status: 'active',
-    trunk_configured: true,
-    message: 'Outbound trigger ready — POST phone_number to dispatch a call',
+    message: 'Outbound trigger ready',
   });
 }
