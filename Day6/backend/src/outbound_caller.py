@@ -381,6 +381,12 @@ async def entrypoint(ctx: JobContext):
         agent.set_participant(participant)
         logger.info("Participant connected: %s — conversation starting", phone_number)
 
+        # --- CRITICAL: Agent must speak FIRST on outbound calls ---
+        # Generate the opening greeting immediately — don't wait for user input
+        await session.generate_reply(
+            instructions="Say your opening greeting NOW. Introduce yourself, state why you're calling, and offer opt-out. Use Devanagari Hindi. Keep it under 3 sentences."
+        )
+
         # --- Monitor for participant disconnect (user hangs up) ---
         @ctx.room.on("participant_disconnected")
         def _on_disconnect(p: rtc.RemoteParticipant):
