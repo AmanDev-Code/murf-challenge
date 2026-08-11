@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
+import { AccessToken } from 'livekit-server-sdk';
 
 /**
- * Outbound call trigger API route.
- * Proxies to the FastAPI trigger_call.py service, or directly dispatches via LiveKit API.
+ * Outbound call trigger — dispatches directly to LiveKit (no separate FastAPI needed).
+ * Creates an agent dispatch for "voicepay-outbound" with the phone number in metadata.
  */
 
-const LIVEKIT_URL = process.env.LIVEKIT_URL;
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
-const TRIGGER_API_URL = process.env.OUTBOUND_TRIGGER_URL || 'http://localhost:8080';
+const LIVEKIT_URL = process.env.LIVEKIT_URL || '';
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || '';
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || '';
 
 export async function POST(req: Request) {
   try {
@@ -22,71 +22,89 @@ export async function POST(req: Request) {
       );
     }
 
-    // Try to proxy to the FastAPI trigger service first
-    try {
-      const res = await fetch(`${TRIGGER_API_URL}/api/outbound/call`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone_number,
-          user_name: user_name || 'User',
-          purpose: purpose || 'general_reminder',
-          persona: persona || 'anisha',
-          language: language || 'hi',
-          force: false,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        return NextResponse.json(data);
-      }
-
-      // If trigger API is down, return a helpful message
-      const errorText = await res.text().catch(() => 'Unknown error');
+    if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
       return NextResponse.json(
-        {
-          status: 'error',
-          message: `Trigger API returned ${res.status}: ${errorText}`,
-          hint: 'Make sure trigger_call.py is running: uvicorn trigger_call:app --port 8080',
-        },
-        { status: 502 }
+        { status: 'error', message: 'LiveKit credentials not configured' },
+        { status: 500 }
       );
-    } catch (fetchError) {
-      // Trigger API not running — return helpful error
+    }
+
+    // Build room name for this outbound call
+    const roomName = `outbound-${phone_number.replace(/\+/g, '')}-${Date.now()}`;
+
+    // Build metadata payload that the outbound worker reads
+    const metadata = JSON.stringify({
+      phone_number,
+      user_name: user_name || 'User',
+      purpose: purpose || 'general_reminder',
+      persona: persona || 'anisha',
+      language: language || 'hi',
+      facts: {},
+      attempt: 1,
+      triggered_at: new Date().toISOString(),
+    });
+
+    // Use LiveKit Server SDK to create agent dispatch
+    // The dispatch tells LiveKit to spin up a room and route it to "voicepay-outbound" worker
+    const httpUrl = LIVEKIT_URL.replace('wss://', 'https://').replace('ws://', 'http://');
+
+    const response = await fetch(`${httpUrl}/twirp/livekit.AgentDispatchService/CreateDispatch`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await createServiceToken()}`,
+      },
+      body: JSON.stringify({
+        agent_name: 'voicepay-outbound',
+        room: roomName,
+        metadata: metadata,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return NextResponse.json({
+        status: 'dispatched',
+        room_name: roomName,
+        phone_number,
+        purpose: purpose || 'general_reminder',
+        message: `Call dispatched to ${user_name || phone_number}`,
+        dispatch_id: data.dispatch_id || roomName,
+      });
+    } else {
+      const errText = await response.text().catch(() => 'Unknown error');
       return NextResponse.json(
-        {
-          status: 'error',
-          message: 'Outbound trigger API is not running.',
-          hint: 'Start it with: cd Day6/backend && uvicorn src.trigger_call:app --port 8080',
-          details: String(fetchError),
-        },
-        { status: 503 }
+        { status: 'error', message: `LiveKit dispatch failed: ${response.status} - ${errText}` },
+        { status: 502 }
       );
     }
   } catch (error) {
     return NextResponse.json(
-      { status: 'error', message: String(error) },
+      { status: 'error', message: `Dispatch error: ${String(error)}` },
       { status: 500 }
     );
   }
 }
 
-export async function GET() {
-  // Health check — also proxies to trigger API status
-  try {
-    const res = await fetch(`${TRIGGER_API_URL}/api/outbound/status`);
-    if (res.ok) {
-      const data = await res.json();
-      return NextResponse.json(data);
-    }
-  } catch {
-    // Fall through
-  }
+async function createServiceToken(): Promise<string> {
+  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+    identity: 'voicepay-trigger',
+    ttl: '1m',
+  });
+  at.addGrant({
+    roomCreate: true,
+    roomAdmin: true,
+    roomJoin: true,
+    canPublish: true,
+    canSubscribe: true,
+  });
+  return await at.toJwt();
+}
 
+export async function GET() {
   return NextResponse.json({
-    status: 'trigger_api_offline',
-    message: 'Start trigger_call.py to enable outbound calls',
-    hint: 'cd Day6/backend && uvicorn src.trigger_call:app --port 8080',
+    status: 'active',
+    trunk_configured: true,
+    message: 'Outbound trigger ready — POST phone_number to dispatch a call',
   });
 }
