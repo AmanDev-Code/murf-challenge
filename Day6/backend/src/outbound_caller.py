@@ -349,8 +349,11 @@ async def entrypoint(ctx: JobContext):
         session.start(
             agent=agent,
             room=ctx.room,
-            room_input_options=room_io.RoomInputOptions(
-                noise_cancellation=noise_cancellation.BVCTelephony(),
+            room_options=room_io.RoomOptions(
+                audio_input=room_io.AudioInputOptions(
+                    noise_cancellation=noise_cancellation.BVCTelephony(),
+                ),
+                close_on_disconnect=False,  # Don't auto-close while phone is ringing
             ),
         )
     )
@@ -365,15 +368,14 @@ async def entrypoint(ctx: JobContext):
                 sip_trunk_id=OUTBOUND_TRUNK_ID,
                 sip_call_to=sip_call_to,
                 participant_identity=phone_number,
-                wait_until_answered=True,
             )
         )
 
-        # Call was answered!
+        # Wait for the participant to actually join (they answered)
         await session_task
-        logger.info("Call answered! Waiting for participant...")
+        logger.info("Call placed! Waiting for participant to answer...")
 
-        participant = await ctx.wait_for_participant(identity=phone_number)
+        participant = await ctx.wait_for_participant(identity=phone_number, timeout=30)
         agent.set_participant(participant)
         logger.info("Participant connected: %s — conversation starting", phone_number)
 
