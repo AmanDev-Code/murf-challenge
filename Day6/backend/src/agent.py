@@ -2227,7 +2227,124 @@ async def voicepay_session(ctx: JobContext) -> None:
 
 
 # =============================================================================
-# ENTRYPOINT
+# OUTBOUND CALLER — runs in the SAME server, agent_name="voicepay-outbound"
+# =============================================================================
+from outbound_caller import OutboundCallerAgent, OUTBOUND_TRUNK_ID, VOICE_PERSONAS as OB_PERSONAS
+from outbound_prompts import build_outbound_system_prompt
+import json as _json_mod
+
+
+@server.rtc_session(agent_name="voicepay-outbound")
+async def outbound_session(ctx: JobContext) -> None:
+    """Handler for outbound call dispatches — places a real phone call."""
+    logger.info("OUTBOUND dispatch received")
+    await ctx.connect()
+
+    # Parse metadata
+    try:
+        metadata = _json_mod.loads(ctx.job.metadata) if ctx.job.metadata else {}
+    except Exception:
+        metadata = {}
+
+    phone_number = metadata.get("phone_number", "")
+    user_name = metadata.get("user_name", "User")
+    purpose = metadata.get("purpose", "general_reminder")
+    language = metadata.get("language", "en")
+    persona_id = metadata.get("persona", "anisha")
+    facts = metadata.get("facts", {})
+    user_id = metadata.get("user_id")
+
+    if not phone_number:
+        logger.error("No phone_number in outbound metadata — aborting")
+        ctx.shutdown()
+        return
+
+    if not OUTBOUND_TRUNK_ID:
+        logger.error("SIP_OUTBOUND_TRUNK_ID not set — run setup_sip_trunk.py first")
+        ctx.shutdown()
+        return
+
+    persona = OB_PERSONAS.get(persona_id, OB_PERSONAS["anisha"])
+
+    agent = OutboundCallerAgent(
+        user_name=user_name,
+        phone_number=phone_number,
+        purpose=purpose,
+        language=language,
+        persona_name=persona["voice"],
+        facts=facts,
+        user_id=user_id,
+        metadata=metadata,
+    )
+
+    session = AgentSession(
+        stt=deepgram.STT(model="nova-3", language="multi", smart_format=True),
+        llm=google.LLM(
+            model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite"),
+            temperature=0.7,
+        ),
+        tts=murf.TTS(
+            voice=persona["voice"],
+            style=persona["style"],
+            model="falcon-2",
+            sample_rate=48000,
+            locale=persona["locale"],
+            speed=0,
+            pitch=0,
+            tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
+            text_pacing=False,
+        ),
+        turn_detection=MultilingualModel(unlikely_threshold=0.3),
+        vad=ctx.proc.userdata["vad"],
+        preemptive_generation=True,
+    )
+
+    # Start session BEFORE dialing
+    session_task = asyncio.create_task(
+        session.start(
+            agent=agent,
+            room=ctx.room,
+            room_input_options=room_io.RoomInputOptions(
+                noise_cancellation=noise_cancellation.BVCTelephony(),
+            ),
+        )
+    )
+
+    # Place the call
+    try:
+        logger.info("DIALING %s via trunk %s...", phone_number, OUTBOUND_TRUNK_ID)
+        await ctx.api.sip.create_sip_participant(
+            api.CreateSIPParticipantRequest(
+                room_name=ctx.room.name,
+                sip_trunk_id=OUTBOUND_TRUNK_ID,
+                sip_call_to=phone_number,
+                participant_identity=phone_number,
+                wait_until_answered=True,
+            )
+        )
+        await session_task
+        participant = await ctx.wait_for_participant(identity=phone_number)
+        agent.set_participant(participant)
+        logger.info("OUTBOUND CONNECTED: %s answered", phone_number)
+
+    except Exception as e:
+        logger.error("Outbound call failed: %s", e)
+        from memory import log_call_outcome as _log_out
+        try:
+            outcome = "no_answer"
+            err = str(e)
+            if "486" in err:
+                outcome = "busy"
+            elif "603" in err:
+                outcome = "declined"
+            await _log_out(user_id, phone_number, purpose, outcome, 0, metadata.get("attempt", 1), persona["voice"].lower(), f"Failed: {err[:100]}")
+        except Exception:
+            pass
+        ctx.shutdown()
+
+
+# =============================================================================
+# ENTRYPOINT — runs BOTH inbound (voicepay) and outbound (voicepay-outbound)
 # =============================================================================
 if __name__ == "__main__":
     cli.run_app(server)
