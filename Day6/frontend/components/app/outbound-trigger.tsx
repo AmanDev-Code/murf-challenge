@@ -124,19 +124,33 @@ export function OutboundTrigger() {
     }
 
     try {
-      await fetch('/api/outbound/hangup', {
+      const res = await fetch('/api/outbound/hangup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ room_name: activeRoom }),
       });
-    } catch {
-      // Even if API fails, reset UI
+      const data = await res.json();
+      console.log('Hangup response:', data);
+    } catch (err) {
+      console.error('Hangup error:', err);
     }
 
     setStatus('ended');
     setMessage('Call ended');
     setActiveRoom(null);
   };
+
+  // Auto-reset UI after 60 seconds if still showing "Calling" (call ended on backend but UI didn't know)
+  useEffect(() => {
+    if (status === 'ringing' || status === 'connected') {
+      const timer = setTimeout(() => {
+        setStatus('ended');
+        setMessage('Call ended');
+        setActiveRoom(null);
+      }, 120000); // 2 min max
+      return () => clearTimeout(timer);
+    }
+  }, [status]);
 
   // Floating button when closed
   if (!isOpen) {
