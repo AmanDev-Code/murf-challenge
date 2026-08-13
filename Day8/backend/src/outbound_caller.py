@@ -150,6 +150,61 @@ class OutboundCallerAgent(Agent):
         except Exception as e:
             logger.warning("Failed to log call outcome: %s", e)
 
+        # Day 8: Persist to call_analytics for dashboard
+        try:
+            from memory import get_pool
+            import json as _json
+            pool = await get_pool()
+
+            # Map outbound outcomes to analytics outcomes
+            analytics_outcome = "success" if outcome in ("answered", "callback_requested") else "failed"
+            if outcome == "no_answer":
+                analytics_outcome = "abandoned"
+            elif outcome in ("failed", "busy", "declined"):
+                analytics_outcome = "failed"
+
+            job_ctx = get_job_context()
+            room_name = job_ctx.room.name if job_ctx else f"outbound_{self._phone_number}"
+
+            async with pool.acquire() as conn:
+                await conn.execute(
+                    """
+                    INSERT INTO call_analytics (
+                        room_name, user_id, persona, channel,
+                        started_at, ended_at, duration_s,
+                        user_turns, agent_turns,
+                        tool_calls, tools_used, tool_errors,
+                        language, outcome, outcome_reason,
+                        success_criteria_met, metadata
+                    ) VALUES (
+                        $1, $2, $3, 'sip',
+                        to_timestamp($4), NOW(), $5,
+                        0, 0,
+                        '{}'::jsonb, '{}', 0,
+                        $6, $7, $8,
+                        $9, $10::jsonb
+                    )
+                    ON CONFLICT (room_name) DO UPDATE SET
+                        ended_at = NOW(),
+                        duration_s = EXCLUDED.duration_s,
+                        outcome = EXCLUDED.outcome,
+                        outcome_reason = EXCLUDED.outcome_reason
+                    """,
+                    room_name,
+                    self._user_id,
+                    self._persona_name.lower(),
+                    self._call_start or time.time(),
+                    duration,
+                    "en",
+                    analytics_outcome,
+                    f"Outbound {self._purpose}: {outcome}",
+                    [self._purpose] if analytics_outcome == "success" else [],
+                    _json.dumps({"phone": self._phone_number, "purpose": self._purpose}),
+                )
+            logger.info("CALL ANALYTICS (SIP): room=%s outcome=%s", room_name, analytics_outcome)
+        except Exception as e:
+            logger.warning("call_analytics persist failed for outbound (non-fatal): %s", e)
+
         # Delete room = hang up SIP call
         try:
             job_ctx = get_job_context()

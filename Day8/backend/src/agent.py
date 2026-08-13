@@ -2118,6 +2118,101 @@ class VoicePayAgent(Agent):
             f"Ask if they have any other questions."
         )
 
+    # ------------------------------------------------------------------
+    # Day 8: Transfer to Phone — initiate outbound SIP call to user
+    # ------------------------------------------------------------------
+    @function_tool
+    async def call_me_on_phone(
+        self,
+        context: RunContext,
+        phone_number: str,
+        reason: str = "continue conversation",
+    ) -> str:
+        """Transfer this conversation to the user's phone via outbound call.
+
+        Call this when the user says things like:
+        - "Call me on my phone"
+        - "Can you call me?"
+        - "I'd prefer to talk on phone"
+        - "Transfer to my phone"
+        - "Mujhe phone pe call karo"
+
+        Args:
+            phone_number: The user's phone number (Indian format, 10 digits).
+                Ask the user for their number before calling this tool.
+                Example: "9876543210" or "+919876543210"
+            reason: Why the transfer is being made. Example: "User requested phone call"
+
+        The system will place an outbound SIP call to the user.
+        """
+        self.stats.bump_tool("call_me_on_phone")
+
+        if self._conv_logger:
+            await self._conv_logger.log_tool_call("call_me_on_phone", {"phone": "XXXXXXXX", "reason": reason})
+
+        # Always use the configured SIP address (Linphone) for demo
+        sip_uri = os.environ.get("LINPHONE_SIP_URI", "sip:aman021998@sip.linphone.org")
+        sip_trunk_id = os.environ.get("SIP_OUTBOUND_TRUNK_ID", "")
+
+        if not sip_trunk_id:
+            return (
+                "TRANSFER FAILED: SIP trunk not configured. "
+                "Tell the user: 'I'm sorry, phone transfer is not available right now. "
+                "Is there anything else I can help you with on this call?'"
+            )
+
+        try:
+            from livekit import api as lk_api
+
+            # Create a new room for the outbound call
+            room_name = f"transfer_{self.stats.room}_{int(time.time())}"
+
+            # Dispatch outbound call agent
+            lk_client = lk_api.LiveKitAPI()
+            await lk_client.agent_dispatch.create_dispatch(
+                lk_api.CreateAgentDispatchRequest(
+                    agent_name="voicepay-outbound",
+                    room=room_name,
+                    metadata=_json.dumps({
+                        "phone_number": phone_number,
+                        "sip_uri": sip_uri,
+                        "user_name": self._user_memory.get("name", "User") if self._user_memory else "User",
+                        "purpose": "transfer",
+                        "persona": self.persona.get("name_display", "anisha").lower(),
+                        "language": self.stats.language_detected or "en",
+                        "user_id": self._user_id,
+                        "facts": {},
+                    }),
+                )
+            )
+            await lk_client.aclose()
+
+            if self._conv_logger:
+                await self._conv_logger.log_system_event(f"Outbound call dispatched to {phone_number}")
+
+            await self._push_visual("escalation", {
+                "reference_id": f"CALL-{phone_number[-4:]}",
+                "type": "transfer",
+                "urgency": "medium",
+                "status": "open",
+                "is_update": False,
+            })
+
+            return (
+                f"CALL DISPATCHED: An outbound call is being placed now. "
+                f"Tell the user: 'I'm calling your phone now. Please pick up when it rings. "
+                f"I'll continue our conversation there. You can end this browser call.' "
+                f"The user should hear their phone ring within 10-15 seconds."
+            )
+
+        except Exception as e:
+            logger.warning("call_me_on_phone failed: %s", e)
+            return (
+                f"TRANSFER FAILED: {str(e)[:100]}. "
+                f"Tell the user: 'I'm sorry, I could not connect the call right now. "
+                f"Would you like to continue here instead?'"
+            )
+
 
 # =============================================================================
 # SERVER + SESSION WIRING
