@@ -787,10 +787,50 @@ _OUTPUT_BLOCK_PATTERNS = [
     # Agent leaking raw Aadhaar/card patterns
     (re.compile(r"\b\d{4}\s?\d{4}\s?\d{4}\s?\d{0,4}\b"),
      "potential card/aadhaar number"),
-    # Gemini hallucinating tool calls as text (tool_code, print(default_api...), etc.)
+    # Gemini hallucinating tool calls as text — EXPANDED patterns
     (re.compile(r"tool_code|print\s*\(\s*default_api\.|default_api\.\w+\(", re.I),
      "hallucinated tool code"),
+    (re.compile(r"print\s*\(.*?\.\w+\(.*?\)\s*\)", re.I),
+     "hallucinated print statement"),
+    (re.compile(r"\bcall\s+print\s*\(", re.I),
+     "hallucinated call print"),
+    (re.compile(r"```(?:python|tool_code|code)", re.I),
+     "code block in speech"),
 ]
+
+
+# Regex to STRIP tool-call garbage from agent output (instead of blocking entirely)
+_TOOL_CODE_STRIP = re.compile(
+    r"(?:call\s+)?print\s*\(.*?\)\s*;?\s*",
+    re.IGNORECASE | re.DOTALL,
+)
+_CODE_BLOCK_STRIP = re.compile(
+    r"```[\s\S]*?```",
+    re.MULTILINE,
+)
+_DEFAULT_API_STRIP = re.compile(
+    r"default_api\.\w+\([^)]*\)\s*",
+    re.IGNORECASE,
+)
+
+
+def sanitize_agent_output(text: str) -> str:
+    """
+    Remove hallucinated tool code from agent speech BEFORE it reaches TTS.
+    Returns cleaned text, or empty string if nothing salvageable remains.
+    """
+    if not text:
+        return text
+    result = text
+    # Strip code blocks
+    result = _CODE_BLOCK_STRIP.sub("", result)
+    # Strip print(default_api...) patterns
+    result = _TOOL_CODE_STRIP.sub("", result)
+    # Strip standalone default_api references
+    result = _DEFAULT_API_STRIP.sub("", result)
+    # Clean up leftover whitespace/newlines
+    result = re.sub(r"\n{2,}", "\n", result).strip()
+    return result
 
 
 def validate_agent_output(text: str) -> tuple[bool, str]:
@@ -2366,6 +2406,35 @@ async def voicepay_session(ctx: JobContext) -> None:
         # sentence — biggest single win for perceived latency.
         preemptive_generation=True,
     )
+
+    # -------------------------------------------------------------------
+    # Day 8: Text sanitization — strip hallucinated tool code before TTS
+    # This intercepts EVERY piece of text the LLM generates before it
+    # reaches TTS. If Gemini hallucinates print(default_api...) garbage,
+    # we strip it here so the user never hears it.
+    # -------------------------------------------------------------------
+    @session.on("agent_speech_created")
+    def _on_speech_created(ev: Any) -> None:
+        """Sanitize agent speech before TTS — strip hallucinated code."""
+        try:
+            source = getattr(ev, "source", None) or getattr(ev, "text", None)
+            if not source:
+                return
+            # Check if the text contains hallucinated tool code
+            if re.search(r"print\s*\(|default_api\.|tool_code|```", source, re.I):
+                cleaned = sanitize_agent_output(source)
+                if cleaned != source:
+                    logger.warning(
+                        "SANITIZED hallucinated code from agent output: '%s' → '%s'",
+                        source[:100], cleaned[:100]
+                    )
+                    # Replace the text on the event if possible
+                    if hasattr(ev, "text"):
+                        ev.text = cleaned
+                    if hasattr(ev, "source"):
+                        ev.source = cleaned
+        except Exception:
+            pass
 
     # -------------------------------------------------------------------
     # Metrics wiring — latency + usage

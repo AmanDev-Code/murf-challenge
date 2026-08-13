@@ -6,15 +6,23 @@ import { motion, AnimatePresence } from 'motion/react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Call {
-  id: string;
+  id?: string;
+  session_id?: string;
+  room_name?: string;
   created_at: string;
-  duration_seconds: number;
-  channel: string; // browser | sip
-  language: string; // en | hindi | hinglish
-  outcome: string; // success | failed | abandoned | error
+  started_at?: string;
+  duration_seconds?: number;
+  duration_s?: number;
+  channel: string;
+  language: string;
+  outcome: string;
   outcome_reason?: string | null;
   tools?: string[];
+  tools_used?: string[];
   avg_latency_ms?: number;
+  persona?: string;
+  user_turns?: number;
+  agent_turns?: number;
 }
 
 interface Filters {
@@ -211,9 +219,10 @@ export function CallHistory() {
               <tbody>
                 <AnimatePresence initial={false}>
                   {calls.map((call, i) => {
-                    const isOpen = expanded === call.id;
+                    const callId = call.session_id || call.id || call.room_name || `call-${i}`;
+                    const isOpen = expanded === callId;
                     return (
-                      <Fragment key={call.id}>
+                      <Fragment key={callId}>
                         <motion.tr
                           layout
                           initial={{ opacity: 0, y: -6 }}
@@ -224,7 +233,7 @@ export function CallHistory() {
                             duration: 0.2,
                           }}
                           onClick={() =>
-                            setExpanded((prev) => (prev === call.id ? null : call.id))
+                            setExpanded((prev) => (prev === callId ? null : callId))
                           }
                           className="cursor-pointer border-b border-white/[0.04] transition hover:bg-white/[0.03]"
                         >
@@ -236,10 +245,10 @@ export function CallHistory() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-white/70">
-                            {relativeTime(call.created_at)}
+                            {relativeTime(call.created_at || call.started_at || '')}
                           </td>
                           <td className="px-4 py-3 tabular-nums text-white/80">
-                            {formatDuration(call.duration_seconds)}
+                            {formatDuration(call.duration_seconds || call.duration_s || 0)}
                           </td>
                           <td className="px-4 py-3">
                             <span
@@ -266,22 +275,27 @@ export function CallHistory() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-1">
-                              {(call.tools || []).slice(0, 3).map((t) => (
-                                <span
-                                  key={t}
-                                  className="rounded-md border border-white/[0.08] bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/70"
-                                >
-                                  {t}
-                                </span>
-                              ))}
-                              {(call.tools?.length ?? 0) > 3 && (
-                                <span className="rounded-md border border-white/[0.08] bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/40">
-                                  +{(call.tools?.length ?? 0) - 3}
-                                </span>
-                              )}
-                              {!call.tools?.length && (
-                                <span className="text-[11px] text-white/30">—</span>
-                              )}
+                              {(() => {
+                                const toolsList = call.tools_used || call.tools || [];
+                                if (toolsList.length === 0) return <span className="text-[11px] text-white/30">—</span>;
+                                return (
+                                  <>
+                                    {toolsList.slice(0, 3).map((t) => (
+                                      <span
+                                        key={t}
+                                        className="rounded-md border border-white/[0.08] bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/70"
+                                      >
+                                        {t}
+                                      </span>
+                                    ))}
+                                    {toolsList.length > 3 && (
+                                      <span className="rounded-md border border-white/[0.08] bg-white/[0.04] px-1.5 py-0.5 text-[10px] text-white/40">
+                                        +{toolsList.length - 3}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </td>
                           <td className="px-4 py-3 tabular-nums text-white/70">
@@ -313,20 +327,18 @@ export function CallHistory() {
                                       All tools used
                                     </p>
                                     <div className="flex flex-wrap gap-1.5">
-                                      {(call.tools || []).length === 0 ? (
-                                        <span className="text-sm text-white/40">
-                                          No tools invoked
-                                        </span>
-                                      ) : (
-                                        call.tools?.map((t) => (
+                                      {(() => {
+                                        const allTools = call.tools_used || call.tools || [];
+                                        if (allTools.length === 0) return <span className="text-sm text-white/40">No tools invoked</span>;
+                                        return allTools.map((t) => (
                                           <span
                                             key={t}
                                             className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 text-xs text-white/80"
                                           >
                                             {t}
                                           </span>
-                                        ))
-                                      )}
+                                        ));
+                                      })()}
                                     </div>
                                   </div>
                                 </div>

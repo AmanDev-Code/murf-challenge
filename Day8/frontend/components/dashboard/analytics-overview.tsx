@@ -113,7 +113,7 @@ export function AnalyticsOverview() {
       }
       if (tlRes?.ok) {
         const data = await tlRes.json();
-        setTimeline(data.timeline || data.buckets || data || []);
+        setTimeline(data.data || data.timeline || data.buckets || []);
       }
       if (toolsRes?.ok) {
         const data = await toolsRes.json();

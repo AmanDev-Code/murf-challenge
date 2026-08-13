@@ -110,14 +110,17 @@ export function LatencyMetrics() {
   }
 
   const percentiles = data?.percentiles ?? { p50: 0, p75: 0, p95: 0, p99: 0 };
-  const components = data?.components ?? {
-    eou_avg_ms: 0,
-    llm_ttft_avg_ms: 0,
-    tts_ttfb_avg_ms: 0,
+  const rawComp = data?.components || data?.component_averages || {};
+  const components = {
+    eou_avg_ms: rawComp.eou_avg_ms || rawComp.eou_ms || 0,
+    llm_ttft_avg_ms: rawComp.llm_ttft_avg_ms || rawComp.llm_ttft_ms || 0,
+    tts_ttfb_avg_ms: rawComp.tts_ttfb_avg_ms || rawComp.tts_ttfb_ms || 0,
   };
-  const timeline = (data?.timeline ?? []).map((t) => ({
-    ...t,
+  const timeline = (data?.timeline ?? []).map((t: any) => ({
     time: formatBucket(t.bucket),
+    eou_ms: t.avg_eou || t.eou_ms || 0,
+    llm_ms: t.avg_llm || t.llm_ms || 0,
+    tts_ms: t.avg_tts || t.tts_ms || 0,
   }));
 
   const percentileCards = [
