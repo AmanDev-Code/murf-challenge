@@ -117,7 +117,8 @@ export function AnalyticsOverview() {
       }
       if (toolsRes?.ok) {
         const data = await toolsRes.json();
-        setTools(data.tools || data || []);
+        const rawTools = data.tools || data || [];
+        setTools(rawTools.map((t: any) => ({ tool: t.tool || t.tool_name || t.name || '', count: t.count || t.call_count || 0 })));
       }
 
       if (!firstLoadRef.current) {
